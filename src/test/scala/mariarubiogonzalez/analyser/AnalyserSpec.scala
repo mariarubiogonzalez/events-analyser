@@ -36,17 +36,9 @@ class AnalyserSpec
       """{ "event_type": "bar", "data": "dolor", "timestamp": 1626558040 }""",
       """{ "event_type": "bar", "data": "sit", "timestamp": 1626558040 }""",
       """{ "event_type": "foo", "data": "dolor", "timestamp": 1626558042 }"""
-    ).mkString("\n").getBytes(UTF_8.name)
-
-    val state = new State()
-
-    val analyser = Analyser(
-      source = StreamConverters.fromInputStream { () => new ByteArrayInputStream(events) },
-      state = state
     )
-    analyser.stream.runWith(Sink.ignore).futureValue
 
-    state.get should ===(
+    run(events) should ===(
       Map(
         "baz" -> Map(
           "amet" -> 1
@@ -72,17 +64,9 @@ class AnalyserSpec
       """{ "e�;""",
       """"  2""",
       """{ "event_type": "bar", "data": "lorem", "timestamp": 1626558040 }"""
-    ).mkString("\n").getBytes(UTF_8.name)
-
-    val state = new State()
-
-    val analyser = Analyser(
-      source = StreamConverters.fromInputStream { () => new ByteArrayInputStream(events) },
-      state = state
     )
-    analyser.stream.runWith(Sink.ignore).futureValue
 
-    state.get should ===(
+    run(events) should ===(
       Map(
         "foo" -> Map(
           "ipsum" -> 1
@@ -96,4 +80,18 @@ class AnalyserSpec
     )
 
   }
+
+  private def run(events: Seq[String]): Map[String, Map[String, Int]] = {
+    val state = new State()
+    val source = StreamConverters.fromInputStream { () =>
+      new ByteArrayInputStream(events.mkString("\n").getBytes(UTF_8.name))
+    }
+    val analyser = Analyser(
+      source = source,
+      state = state
+    )
+    analyser.stream.runWith(Sink.ignore).futureValue
+    state.get
+  }
+
 }
