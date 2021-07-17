@@ -62,4 +62,38 @@ class AnalyserSpec
       )
     )
   }
+
+  "should ignore invalid events" in {
+    val events = Seq(
+      """{ "event_type": "foo", "data": "ipsum", "timestamp": 1626558040 }""",
+      """{ "event_type": "bar", "data": "lorem", "timestamp": 1626558040 }""",
+      """{ "event_type": "bar", "data": "dolor", "timestamp": 1626558040 }""",
+      """{ "event_type": "bar", "data": "sit", "timestamp": 1626558040 }""",
+      """{ "e�;""",
+      """"  2""",
+      """{ "event_type": "bar", "data": "lorem", "timestamp": 1626558040 }"""
+    ).mkString("\n").getBytes(UTF_8.name)
+
+    val state = new State()
+
+    val analyser = Analyser(
+      source = StreamConverters.fromInputStream { () => new ByteArrayInputStream(events) },
+      state = state
+    )
+    analyser.stream.runWith(Sink.ignore).futureValue
+
+    state.get should ===(
+      Map(
+        "foo" -> Map(
+          "ipsum" -> 1
+        ),
+        "bar" -> Map(
+          "lorem" -> 2,
+          "dolor" -> 1,
+          "sit"   -> 1
+        )
+      )
+    )
+
+  }
 }
