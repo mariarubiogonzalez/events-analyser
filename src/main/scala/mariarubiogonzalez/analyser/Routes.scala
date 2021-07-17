@@ -13,7 +13,10 @@ class Routes()(implicit val system: ActorSystem) extends SprayJsonSupport {
   val metrics: Route =
     get {
       path("metrics") {
-        complete(OK, Metrics(from = 1L, to = 1L, count = Map("foo" -> Map("bar" -> 1))))
+        complete(
+          OK,
+          Metrics(from = 1L, to = 1L, count = Map("foo" -> Map("lorem" -> 1, "ipsum" -> 1), "bar" -> Map("lorem" -> 1)))
+        )
       }
     }
 }

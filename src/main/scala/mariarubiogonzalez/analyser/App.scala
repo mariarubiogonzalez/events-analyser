@@ -2,13 +2,16 @@ package mariarubiogonzalez.analyser
 
 import akka.actor.{ActorSystem, Terminated}
 import akka.http.scaladsl.Http
+import akka.stream.IOResult
+import akka.stream.scaladsl.{Source, StreamConverters}
+import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
-class App extends LazyLogging {
+class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLogging {
 
   implicit val system: ActorSystem          = ActorSystem("events-analyser-actor-system")
   implicit val ec: ExecutionContextExecutor = system.getDispatcher
@@ -20,6 +23,7 @@ class App extends LazyLogging {
       case Success(binding) =>
         val address = binding.localAddress
         logger.info("Server online at http://{}:{}/", address.getHostString, address.getPort)
+        logger.info("Starting events processor")
       case Failure(ex) =>
         logger.error("Failed to bind HTTP endpoint, terminating system", ex)
         system.terminate()
@@ -35,7 +39,8 @@ class App extends LazyLogging {
 object App {
 
   def main(args: Array[String]): Unit = {
-    val app = new App()
+    val stdinSource: Source[ByteString, Future[IOResult]] = StreamConverters.fromInputStream(() => System.in)
+    val app                                               = new App(stdinSource)
     app.start()
 
     scala.sys.addShutdownHook {
