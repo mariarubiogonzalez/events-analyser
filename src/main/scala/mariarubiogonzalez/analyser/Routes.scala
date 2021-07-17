@@ -8,14 +8,14 @@ import akka.http.scaladsl.server.Route
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
 
-class Routes()(implicit val system: ActorSystem) extends SprayJsonSupport {
+case class Routes(state: State)(implicit val system: ActorSystem) extends SprayJsonSupport {
 
   val metrics: Route =
     get {
       path("metrics") {
         complete(
           OK,
-          Metrics(from = 1L, to = 1L, count = Map("foo" -> Map("lorem" -> 1, "ipsum" -> 1), "bar" -> Map("lorem" -> 1)))
+          Metrics(from = 1L, to = 1L, count = state.get)
         )
       }
     }

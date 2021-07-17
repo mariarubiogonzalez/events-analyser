@@ -19,7 +19,7 @@ class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLo
   def start(): Unit = {
     val state         = new State()
     val analyser      = Analyser(source, state)
-    val routes        = new Routes()
+    val routes        = Routes(state)
     val futureBinding = Http().newServerAt("localhost", 8080).bind(routes.metrics)
     futureBinding.onComplete {
       case Success(binding) =>

@@ -14,7 +14,8 @@ class RoutesSpec
     with ScalatestRouteTest
     with TypeCheckedTripleEquals {
 
-  val routes = new Routes()
+  private val state  = new State()
+  private val routes = Routes(state)
 
   "Metrics route (GET /metrics) should return latest windowed word count by event type" in {
     val request = Get(uri = "/metrics")
