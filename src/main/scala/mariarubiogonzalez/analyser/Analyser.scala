@@ -7,16 +7,30 @@ import cats.implicits._
 import spray.json.DefaultJsonProtocol._
 import spray.json._
 
+import scala.collection.SortedMap
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
-case class Analyser(source: Source[akka.util.ByteString, Future[IOResult]], state: State)(implicit
-    val materializer: Materializer
+case class Analyser(source: Source[akka.util.ByteString, Future[IOResult]], state: State, window: FiniteDuration)(
+    implicit val materializer: Materializer
 ) {
   val stream: Source[Done, Future[IOResult]] = source
     .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 256, allowTruncation = true))
     .map(_.utf8String)
     .map(_.parseJson.convertTo[Event])
-    .map(event => state.put(event.event_type, event.data))
+    .statefulMapConcat { () =>
+      var latestSeenTimestamp: Long = Long.MinValue
+
+      { event =>
+        latestSeenTimestamp = scala.math.max(latestSeenTimestamp, event.timestamp)
+        state.updateWith { currentState: SortedMap[Long, Map[String, Map[String, Int]]] =>
+          val candidate = Map(event.event_type -> Map(event.data -> 1))
+          val newCount  = currentState.get(event.timestamp).fold(candidate)(currentCount => currentCount |+| candidate)
+          (currentState ++ SortedMap(event.timestamp -> newCount)).rangeFrom(latestSeenTimestamp - window.toSeconds + 1)
+        }
+        Seq(Done)
+      }
+    }
     .withAttributes(ActorAttributes.supervisionStrategy({ _ => Supervision.Resume }))
 }
 
@@ -25,14 +39,22 @@ object Event {
   implicit val format: RootJsonFormat[Event] = jsonFormat3(Event.apply)
 }
 
-class State {
+case class State(initialState: SortedMap[Long, Map[String, Map[String, Int]]] = SortedMap()) {
 
-  private var state: Map[String, Map[String, Int]] = Map()
+  private var state: SortedMap[Long, Map[String, Map[String, Int]]] = initialState
 
-  def get: Map[String, Map[String, Int]] = state
+  def get: (Option[Long], Map[String, Map[String, Int]]) = {
+    val s = state
+    val wordCountByEventType = s.values.flatten
+      .groupMapReduce { case (eventType, _) => eventType } { case (_, count) => count } { _ |+| _ }
+    val latestTimestampSeen = s.keys.maxOption
+    (latestTimestampSeen, wordCountByEventType)
+  }
 
-  def put(eventType: String, word: String): Done = {
-    state = state |+| Map(eventType -> Map(word -> 1))
+  def updateWith(
+      fn: SortedMap[Long, Map[String, Map[String, Int]]] => SortedMap[Long, Map[String, Map[String, Int]]]
+  ): Done = {
+    state = fn(state)
     Done
   }
 

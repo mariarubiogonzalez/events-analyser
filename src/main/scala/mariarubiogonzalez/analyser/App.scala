@@ -17,9 +17,10 @@ class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLo
   implicit val ec: ExecutionContextExecutor = system.getDispatcher
 
   def start(): Unit = {
-    val state         = new State()
-    val analyser      = Analyser(source, state)
-    val routes        = Routes(state)
+    val state         = State()
+    val window        = 10.seconds
+    val analyser      = Analyser(source, state, window)
+    val routes        = Routes(state, window)
     val futureBinding = Http().newServerAt("localhost", 8080).bind(routes.metrics)
     futureBinding.onComplete {
       case Success(binding) =>

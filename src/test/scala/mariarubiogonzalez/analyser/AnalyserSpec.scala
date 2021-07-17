@@ -81,17 +81,41 @@ class AnalyserSpec
 
   }
 
-  private def run(events: Seq[String]): Map[String, Map[String, Int]] = {
-    val state = new State()
+  "should only keep the word count for the latest sliding window" in {
+    val events = Seq(
+      """{ "event_type": "baz", "data": "amet", "timestamp": 1626558031 }""",
+      """{ "event_type": "foo", "data": "lorem", "timestamp": 1626558037 }""",
+      """{ "event_type": "foo", "data": "lorem", "timestamp": 1626558037 }""",
+      """{ "event_type": "bar", "data": "dolor", "timestamp": 1626558040 }""",
+      """{ "event_type": "bar", "data": "sit", "timestamp": 1626558040 }""",
+      """{ "event_type": "foo", "data": "dolor", "timestamp": 1626558042 }"""
+    )
+
+    run(events, window = 3.seconds) should ===(
+      Map(
+        "bar" -> Map(
+          "dolor" -> 1,
+          "sit"   -> 1
+        ),
+        "foo" -> Map(
+          "dolor" -> 1
+        )
+      )
+    )
+  }
+
+  private def run(events: Seq[String], window: FiniteDuration = 15.seconds): Map[String, Map[String, Int]] = {
+    val state = State()
     val source = StreamConverters.fromInputStream { () =>
       new ByteArrayInputStream(events.mkString("\n").getBytes(UTF_8.name))
     }
     val analyser = Analyser(
       source = source,
-      state = state
+      state = state,
+      window = window
     )
     analyser.stream.runWith(Sink.ignore).futureValue
-    state.get
+    state.get._2
   }
 
 }
