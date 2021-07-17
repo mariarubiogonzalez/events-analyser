@@ -3,7 +3,7 @@ package mariarubiogonzalez.analyser
 import akka.actor.{ActorSystem, Terminated}
 import akka.http.scaladsl.Http
 import akka.stream.IOResult
-import akka.stream.scaladsl.{Source, StreamConverters}
+import akka.stream.scaladsl.{Sink, Source, StreamConverters}
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
 
@@ -17,6 +17,8 @@ class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLo
   implicit val ec: ExecutionContextExecutor = system.getDispatcher
 
   def start(): Unit = {
+    val state         = new State()
+    val analyser      = Analyser(source, state)
     val routes        = new Routes()
     val futureBinding = Http().newServerAt("localhost", 8080).bind(routes.metrics)
     futureBinding.onComplete {
@@ -24,6 +26,7 @@ class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLo
         val address = binding.localAddress
         logger.info("Server online at http://{}:{}/", address.getHostString, address.getPort)
         logger.info("Starting events processor")
+        analyser.stream.runWith(Sink.ignore)
       case Failure(ex) =>
         logger.error("Failed to bind HTTP endpoint, terminating system", ex)
         system.terminate()
