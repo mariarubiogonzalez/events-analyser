@@ -1,0 +1,21 @@
+# Created by https://www.toptal.com/developers/gitignore/api/sbt,scala
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+.history
+.cache
+.lib/
+.idea/
+
+### Scala ###
+*.class
+*.log
+.sbt
+.ivy2
+
+# End of https://www.toptal.com/developers/gitignore/api/sbt,scala
+
+.bsp/
