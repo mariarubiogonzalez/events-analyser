@@ -7,7 +7,7 @@ import cats.implicits._
 import spray.json.DefaultJsonProtocol._
 import spray.json._
 
-import scala.collection.SortedMap
+import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
@@ -24,9 +24,8 @@ case class Analyser(source: Source[akka.util.ByteString, Future[IOResult]], stat
       { event =>
         latestSeenTimestamp = scala.math.max(latestSeenTimestamp, event.timestamp)
         state.updateWith { currentState: SortedMap[Long, Map[String, Map[String, Int]]] =>
-          val candidate = Map(event.event_type -> Map(event.data -> 1))
-          val newCount  = currentState.get(event.timestamp).fold(candidate)(currentCount => currentCount |+| candidate)
-          (currentState ++ SortedMap(event.timestamp -> newCount)).rangeFrom(latestSeenTimestamp - window.toSeconds + 1)
+          (currentState |+| SortedMap(event.timestamp -> Map(event.event_type -> Map(event.data -> 1))))
+            .rangeFrom(latestSeenTimestamp - window.toSeconds + 1)
         }
         Seq(Done)
       }
