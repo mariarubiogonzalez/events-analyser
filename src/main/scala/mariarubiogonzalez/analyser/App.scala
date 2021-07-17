@@ -1,34 +1,46 @@
 package mariarubiogonzalez.analyser
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Terminated}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Route
+import com.typesafe.scalalogging.LazyLogging
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
-object App {
+class App extends LazyLogging {
 
-  private def start(routes: Route)(implicit system: ActorSystem): Future[Http.ServerBinding] = {
-    implicit val executionContext: ExecutionContextExecutor = system.getDispatcher
+  implicit val system: ActorSystem          = ActorSystem("events-analyser-actor-system")
+  implicit val ec: ExecutionContextExecutor = system.getDispatcher
 
-    val futureBinding = Http().newServerAt("localhost", 8080).bind(routes)
+  def start(): Unit = {
+    val routes        = new Routes()
+    val futureBinding = Http().newServerAt("localhost", 8080).bind(routes.metrics)
     futureBinding.onComplete {
       case Success(binding) =>
         val address = binding.localAddress
-        system.log.info("Server online at http://{}:{}/", address.getHostString, address.getPort)
+        logger.info("Server online at http://{}:{}/", address.getHostString, address.getPort)
       case Failure(ex) =>
-        system.log.error("Failed to bind HTTP endpoint, terminating system", ex)
+        logger.error("Failed to bind HTTP endpoint, terminating system", ex)
         system.terminate()
     }
-    futureBinding
   }
 
-  def main(args: Array[String]): Unit = {
-    implicit val actorSytem: ActorSystem = ActorSystem("events-analyser-actor-system")
+  def stop(): Future[Terminated] = {
+    system.terminate()
+    system.whenTerminated
+  }
+}
 
-    val routes = new Routes()
-    start(routes.metrics)
+object App {
+
+  def main(args: Array[String]): Unit = {
+    val app = new App()
+    app.start()
+
+    scala.sys.addShutdownHook {
+      Await.result(app.stop(), 30.seconds)
+    }
   }
 
 }
