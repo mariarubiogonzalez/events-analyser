@@ -11,14 +11,16 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
-class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLogging {
+class App(
+    source: Source[akka.util.ByteString, Future[IOResult]],
+    window: FiniteDuration = 10.seconds
+) extends LazyLogging {
 
   implicit val system: ActorSystem          = ActorSystem("events-analyser-actor-system")
   implicit val ec: ExecutionContextExecutor = system.getDispatcher
 
   def start(): Unit = {
     val state         = State()
-    val window        = 10.seconds
     val analyser      = Analyser(source, state, window)
     val routes        = Routes(state, window)
     val futureBinding = Http().newServerAt("localhost", 8080).bind(routes.metrics)
@@ -26,7 +28,7 @@ class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLo
       case Success(binding) =>
         val address = binding.localAddress
         logger.info("Server online at http://{}:{}/", address.getHostString, address.getPort)
-        logger.info("Starting events processor")
+        logger.info(s"Starting events analyser with window of ${window.toSeconds} seconds")
         analyser.stream.runWith(Sink.ignore)
       case Failure(ex) =>
         logger.error("Failed to bind HTTP endpoint, terminating system", ex)
@@ -43,8 +45,9 @@ class App(source: Source[akka.util.ByteString, Future[IOResult]]) extends LazyLo
 object App {
 
   def main(args: Array[String]): Unit = {
+    val windowInSeconds: Int                              = args.headOption.flatMap(_.toIntOption).getOrElse(10)
     val stdinSource: Source[ByteString, Future[IOResult]] = StreamConverters.fromInputStream(() => System.in)
-    val app                                               = new App(stdinSource)
+    val app                                               = new App(stdinSource, windowInSeconds.seconds)
     app.start()
 
     scala.sys.addShutdownHook {
