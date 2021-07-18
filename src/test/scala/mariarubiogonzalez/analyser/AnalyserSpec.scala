@@ -10,6 +10,7 @@ import org.scalatest.matchers.should.Matchers
 
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets.UTF_8
+import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 
 class AnalyserSpec
@@ -39,18 +40,11 @@ class AnalyserSpec
     )
 
     run(events) should ===(
-      Map(
-        "baz" -> Map(
-          "amet" -> 1
-        ),
-        "foo" -> Map(
-          "lorem" -> 2,
-          "dolor" -> 1
-        ),
-        "bar" -> Map(
-          "dolor" -> 1,
-          "sit"   -> 1
-        )
+      SortedMap(
+        1626558031L -> Map("baz" -> Map("amet" -> 1)),
+        1626558037L -> Map("foo" -> Map("lorem" -> 2)),
+        1626558040L -> Map("bar" -> Map("sit" -> 1, "dolor" -> 1)),
+        1626558042L -> Map("foo" -> Map("dolor" -> 1))
       )
     )
   }
@@ -67,18 +61,8 @@ class AnalyserSpec
     )
 
     run(events) should ===(
-      Map(
-        "foo" -> Map(
-          "ipsum" -> 1
-        ),
-        "bar" -> Map(
-          "lorem" -> 2,
-          "dolor" -> 1,
-          "sit"   -> 1
-        )
-      )
+      SortedMap(1626558040L -> Map("bar" -> Map("dolor" -> 1, "lorem" -> 2, "sit" -> 1), "foo" -> Map("ipsum" -> 1)))
     )
-
   }
 
   "should only keep the word count for the latest sliding window" in {
@@ -91,20 +75,20 @@ class AnalyserSpec
       """{ "event_type": "foo", "data": "dolor", "timestamp": 1626558042 }"""
     )
 
-    run(events, window = 3.seconds) should ===(
-      Map(
-        "bar" -> Map(
-          "dolor" -> 1,
-          "sit"   -> 1
-        ),
-        "foo" -> Map(
-          "dolor" -> 1
-        )
+    run(events) should ===(
+      SortedMap(
+        1626558031L -> Map("baz" -> Map("amet" -> 1)),
+        1626558037L -> Map("foo" -> Map("lorem" -> 2)),
+        1626558040L -> Map("bar" -> Map("sit" -> 1, "dolor" -> 1)),
+        1626558042L -> Map("foo" -> Map("dolor" -> 1))
       )
     )
   }
 
-  private def run(events: Seq[String], window: FiniteDuration = 15.seconds): Map[String, Map[String, Int]] = {
+  private def run(
+      events: Seq[String],
+      window: FiniteDuration = 15.seconds
+  ): SortedMap[Long, Map[String, Map[String, Int]]] = {
     val state = State()
     val source = StreamConverters.fromInputStream { () =>
       new ByteArrayInputStream(events.mkString("\n").getBytes(UTF_8.name))
@@ -115,7 +99,7 @@ class AnalyserSpec
       window = window
     )
     analyser.stream.runWith(Sink.ignore).futureValue
-    state.get._2
+    state.get
   }
 
 }

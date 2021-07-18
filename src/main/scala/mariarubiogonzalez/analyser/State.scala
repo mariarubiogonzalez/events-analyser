@@ -8,13 +8,7 @@ case class State(initialState: SortedMap[Long, Map[String, Map[String, Int]]] = 
 
   private var state: SortedMap[Long, Map[String, Map[String, Int]]] = initialState
 
-  def get: (Option[Long], Map[String, Map[String, Int]]) = {
-    val s = state
-    val wordCountByEventType = s.values.flatten
-      .groupMapReduce { case (eventType, _) => eventType } { case (_, count) => count } { _ |+| _ }
-    val latestTimestampSeen = s.keys.maxOption
-    (latestTimestampSeen, wordCountByEventType)
-  }
+  def get: SortedMap[Long, Map[String, Map[String, Int]]] = state
 
   def updateWith(
       fn: SortedMap[Long, Map[String, Map[String, Int]]] => SortedMap[Long, Map[String, Map[String, Int]]]

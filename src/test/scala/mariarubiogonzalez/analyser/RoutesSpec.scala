@@ -37,7 +37,9 @@ class RoutesSpec
         Metrics(
           from = 1626558039L - window.toSeconds + 1,
           to = 1626558039L,
-          count = Map("foo" -> Map("ipse" -> 6))
+          metrics = Seq(
+            Metric("foo", Seq(WordCount("ipse", 6)))
+          )
         )
       )
     }
@@ -53,7 +55,7 @@ class RoutesSpec
         Metrics(
           from = now.getEpochSecond - window.toSeconds + 1,
           to = now.getEpochSecond,
-          count = Map()
+          metrics = Seq()
         )
       )
     }

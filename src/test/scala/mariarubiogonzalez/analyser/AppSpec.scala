@@ -51,14 +51,13 @@ class AppSpec
       val response = Http().singleRequest(Get(s"http://localhost:8080/metrics")).futureValue
       response.status should ===(OK)
       val metrics: Metrics = Unmarshal(response.entity).to[String].futureValue.parseJson.convertTo[Metrics]
-      metrics.count should ===(
-        Map(
-          "foo" -> Map(
-            "lorem" -> 1,
-            "ipsum" -> 1
-          ),
-          "bar" -> Map(
-            "lorem" -> 1
+      metrics should ===(
+        Metrics(
+          from = 1626558031,
+          to = 1626558040,
+          metrics = Seq(
+            Metric("bar", Seq(WordCount("lorem", 1))),
+            Metric("foo", Seq(WordCount("ipsum", 1), WordCount("lorem", 1)))
           )
         )
       )
